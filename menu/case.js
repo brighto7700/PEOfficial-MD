@@ -1,31 +1,8 @@
 // Clean & Readable Command Handler
 const fs = require("fs");
 const path = require("path");
-const { generateWAMessageFromContent } = require("@whiskeysockets/baileys");
+const { generateWAMessageFromContent, prepareWAMessageMedia } = require("@whiskeysockets/baileys");
 const { toggleAntidelete } = require("../antidelete");
-
-if (menuData[command]) {
-    // Use image URL instead of local file
-    const media = await prepareWAMessageMedia(
-        { image: { url: "https://yourdomain.com/bot-image.jpg" } },
-        { upload: conn.waUploadToServer }
-    );
-
-    // Generate the menu message with caption
-    const menuMessage = generateWAMessageFromContent(
-        chatId,
-        {
-            imageMessage: media.imageMessage,
-            caption: menuData[command] // Your menu text
-        },
-        { userJid: chatId }
-    );
-
-    // Send the message
-    await conn.relayMessage(chatId, menuMessage.message, {
-        messageId: menuMessage.key.id
-    });
-}
 
 // Default mode
 if (!global.mode) global.mode = "self";
@@ -47,7 +24,9 @@ const ownerOnlyCommands = [
 const menuData = {};
 try {
   const menuPath = path.join(__dirname, "..", "media", "menu.js");
-  Object.assign(menuData, require(menuPath));
+  if (fs.existsSync(menuPath)) {
+    Object.assign(menuData, require(menuPath));
+  }
 } catch (err) {
   console.error("❌ Error loading menu.js:", err);
 }
@@ -56,7 +35,9 @@ try {
 let core;
 try {
   const corePath = path.join(__dirname, "./core.js");
-  core = require(corePath);
+  if (fs.existsSync(corePath)) {
+    core = require(corePath);
+  }
 } catch (err) {
   console.error("❌ Error loading core.js:", err);
 }
@@ -182,16 +163,42 @@ async function runCommand({
       );
     }
 
-    // 🔸 menu message
+    // 🔸 Interactive Menu Message with Image URL
     if (menuData[command]) {
-      const menuMessage = generateWAMessageFromContent(
-        chatId,
-        { extendedTextMessage: { text: menuData[command] } },
-        { userJid: chatId }
-      );
-      return await conn.relayMessage(chatId, menuMessage.message, {
-        messageId: menuMessage.key.id
-      });
+      try {
+        // Prepare image asset dynamically inside an async functional block safely
+        const media = await prepareWAMessageMedia(
+          { image: { url: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800" } }, // Fallback high-res stylish geometric tech layout image
+          { upload: conn.waUploadToServer }
+        );
+
+        // Generate full image template payload
+        const menuMessage = generateWAMessageFromContent(
+          chatId,
+          {
+            imageMessage: {
+              ...media.imageMessage,
+              caption: menuData[command] // Pulls corresponding command string text content seamlessly
+            }
+          },
+          { userJid: chatId }
+        );
+
+        // Broadcast downstream directly to the remote JID layout pipeline
+        return await conn.relayMessage(chatId, menuMessage.message, {
+          messageId: menuMessage.key.id
+        });
+      } catch (menuImgErr) {
+        // Safe Text-Only fallback execution if the remote image domain breaks or times out
+        const menuMessage = generateWAMessageFromContent(
+          chatId,
+          { extendedTextMessage: { text: menuData[command] } },
+          { userJid: chatId }
+        );
+        return await conn.relayMessage(chatId, menuMessage.message, {
+          messageId: menuMessage.key.id
+        });
+      }
     }
 
     // 🔸 antidelete handler
@@ -225,7 +232,7 @@ async function runCommand({
       }
     }
 
-    // 🔸 unknown command
+    // 🔸 unknown command fallback
     return reply("*ᴜɴᴋɴᴏᴡɴ ᴄᴏᴍᴍᴀɴᴅ! ᴛʀʏ `.ᴍᴇɴᴜ` ʙᴇꜰᴏʀᴇ sʜᴏᴡɪɴɢ ᴏꜰꜰ 𓄀*");
 
   } catch (err) {
@@ -234,9 +241,6 @@ async function runCommand({
   }
 }
 
-// ===============================
-// 🔹 Export
-// ===============================
 module.exports = {
   handleCommand
 };
