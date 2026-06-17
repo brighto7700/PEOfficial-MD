@@ -4,10 +4,10 @@ const path = require("path");
 const P = require("pino");
 const { 
   default: makeWASocket, 
-  useMultiFileAuthState, // Updated to multi-file auth state tracking
+  useMultiFileAuthState, // Clean multi-file auth tracking
   fetchLatestBaileysVersion, 
   DisconnectReason,
-  Browsers // Added native helper array maps
+  Browsers 
 } = require("@whiskeysockets/baileys");
 
 const { handleCommand } = require("./menu/case");
@@ -16,7 +16,7 @@ const { storeMessage, handleMessageRevocation } = require("./antidelete");
 const AntiLinkKick = require("./antilinkkick.js");
 
 // 🔑 PASTE YOUR FRESH PAIRING SESSION STRING HERE DIRECTLY
-const SESSION_ID = "ARSLAN-MD~eyJub2lzZUtleSI6eyJwcml2YXRlIjp7InR5cGUiOiJCdWZmZXIiLCJkYXRhIjoiQU14NEI2cVVlWFVzbTlPYWtsZG4vaWh3N3p2T2ZRMXJKU0ZjYVppbmgzUT0ifSwicHVibGljIjp7InR5cGUiOiJCdWZmZXIiLCJkYXRhIjoiWklzZUJodlI1UDBTeEQzbkFvL0g1VWIrdklvRHNHRXljWDlEOE5XOE5sST0ifX0sInBhaXJpbmdFcGhlbWVyYWxLZXlQYWlyIjp7InByaXZhdGUiOnsidHlwZSI6IkJ1ZmZlciIsImRhdGEiOiJzQXlPL1dJUk51SERmM0pqb1NGTmtMOXRjaDh1bGpwOXFIanJLZlpFK2xBPSJ9LCJwdWJsaWMiOnsidHlwZSI6IkJ1ZmZlciIsImRhdGEiOiJnSlFQTVBwbHhwK2JMUjBneXFLWldXZ0VxMHRWcVRVR2ZjbUdJZEhZYWg0PSJ9fSwic2lnbmVkSWRlbnRpdHlLZXkiOnsicHJpdmF0ZSI6eyJ0eXBlIjoiQnVmZmVyIiwiZGF0YSI6IkVJbnlxNjVlN1h5dWNuTlducENSQXJqaWNvazB3OGdlZGp0a1RmSm9VMDA9In0sInB1YmxpYyI6eyJ0eXBlIjoiQnVmZmVyIiwiZGF0YSI6IkZQc1JINUV5SmZIQk95UnhKMFlGY0NIUjk2NTN4YnNsQWREM2NjRmRQUm89In19LCJzaWduZWRQcmVLZXkiOnsia2V5UGFpciI6eyJwcml2YXRlIjp7InR5cGUiOiJCdWZmZXIiLCJkYXRhIjoiQ1BrMHA0Rkc4cm96eTJzTGZNODQ2NnFlMnR0SGhaa05lL1NQUlI1bVdHdz0ifSwicHVibGljIjp7InR5cGUiOiJCdWZmZXIiLCJkYXRhIjoiWUxDNFloM3NzSEIyeWZZdFJObFRtak9IV0szL1BHQ0tQTCt4K2pab3puaz0ifX0sInNpZ25hdHVyZSI6eyJ0eXBlIjoiQnVmZmVyIiwiZGF0YSI6IklsOWVLVmJnbTBpZVpSMWdvWTAxeEdhYm9lZnNxZU9rL3g5SVhKanZKWHVObFJTSGxMVTVSV1VRTG5zOW9TWjdyajhhQ0RtdXE4RUJqK2d2ZnJzWUNBPT0ifSwia2V5SWQiOjF9LCJyZWdpc3RyYXRpb25JZCI6MywiYWR2U2VjcmV0S2V5IjoiMTBGTkVqbDRsUCtXWjhYSkh2dUxLbWkwMlVtUlU0N296dVRteFVlalFxRT0iLCJwcm9jZXNzZWRIaXN0b3J5TWVzc2FnZXMiOlt7ImtleSI6eyJyZW1vdGVKaWQiOiIyMzQ3MDg1MDg1MjIxQHMud2hhdHNhcHAubmV0IiwiZnJvbU1lIjpmYWxzZSwiaWQiOiJBQ0Q1ODJBNTY4NjJGQTk4MUM5M0E2OEZBRjQzNjI3NiIsInBhcnRpY2lwYW50IjoiIiwiYWRkcmVzc2luZ01vZGUiOiJwbiJ9LCJtZXNzYWdlVGltZXN0YW1wIjoxNzgxNjU1NTczfSx7ImtleSI6eyJyZW1vdGVKaWQiOiIyMzQ3MDg1MDg1MjIxQHMud2hhdHNhcHAubmV0IiwiZnJvbU1lIjpmYWxzZSwiaWQiOiJBQ0E3NUI2QzAxNjc4NjlCQTNGMUMxRDU5NkQ2RDlEQiIsInBhcnRpY2lwYW50IjoiIiwiYWRkcmVzc2luZ01vZGUiOiJwbiJ9LCJtZXNzYWdlVGltZXN0YW1wIjoxNzgxNjU1NTc1fSx7ImtleSI6eyJyZW1vdGVKaWQiOiIyMzQ3MDg1MDg1MjIxQHMud2hhdHNhcHAubmV0IiwiZnJvbU1lIjpmYWxzZSwiaWQiOiJBQ0E2NzIyRjZFNzdFNkE3MzA1OUUwNjJFOTY3NUZEOSIsInBhcnRpY2lwYW50IjoiIiwiYWRkcmVzc2luZ01vZGUiOiJwbiJ9LCJtZXNzYWdlVGltZXN0YW1wIjoxNzgxNjU1NTc1fSx7ImtleSI6eyJyZW1vdGVKaWQiOiIyMzQ3MDg1MDg1MjIxQHMud2hhdHNhcHAubmV0IiwiZnJvbU1lIjpmYWxzZSwiaWQiOiJBQ0Y4QTZCMjU4QzNBMjU3OURBMjExRjdFNkYxMTc1RiIsInBhcnRpY2lwYW50IjoiIiwiYWRkcmVzc2luZ01vZGUiOiJwbiJ9LCJtZXNzYWdlVGltZXN0YW1wIjoxNzgxNjU1NTc1fSx7ImtleSI6eyJyZW1vdGVKaWQiOiIyMzQ3MDg1MDg1MjIxQHMud2hhdHNhcHAubmV0IiwiZnJvbU1lIjpmYWxzZSwiaWQiOiJBQzBBOURGMEFENUEwM0I3RjA5N0IyRDEwMEFCNTUxMiIsInBhcnRpY2lwYW50IjoiIiwiYWRkcmVzc2luZ01vZGUiOiJwbiJ9LCJtZXNzYWdlVGltZXN0YW1wIjoxNzgxNjU1NTc4fV0sIm5leHRQcmVLZXlJZCI6ODEzLCJmaXJzdFVudXBsb2FkZWRQcmVLZXlJZCI6ODEzLCJhY2NvdW50U3luY0NvdW50ZXIiOjEsImFjY291bnRTZXR0aW5ncyI6eyJ1bmFyY2hpdmVDaGF0cyI6ZmFsc2V9LCJyZWdpc3RlcmVkIjp0cnVlLCJwYWlyaW5nQ29kZSI6Ilg1VjI3RVZDIiwibWUiOnsiaWQiOiIyMzQ3MDg1MDg1MjIxOjZAcy53aGF0c2FwcC5uZXQiLCJsaWQiOiIyNDAyMjQ3MzU2MDE2OTo2QGxpZCIsIm5hbWUiOiJCbGF6ZSJ9LCJhY2NvdW50Ijp7ImRldGFpbHMiOiJDTS9Bcm9VRUVJelF4OUVHR0FFZ0FDZ0EiLCJhY2NvdW50U2lnbmF0dXJlS2V5IjoiVG9ra28wcEpKdVVwayswZzZJOGtWOUFOclZrZ0ozVkhkYUlZaFM1b29Wbz0iLCJhY2NvdW50U2lnbmF0dXJlIjoieDNOb2c0MVY0ZjMxQVhmVldudUoreFByNWlIbFpHNWtQa0hRY2ExWWUxVDB5eDFBV3ZnN2craTQ2ek9GWWo0c2d5ZkFJU2pYWFpKZm8zUDhHaTExQ2c9PSIsImRldmljZVNpZ25hdHVyZSI6IjJxeEdpTmF4a09GQVFUWHM5b0hEdjgvdzB0blZDSk5nWmExNEVMNTFYbHphUS9ZeXFuV0VHZEZRRlA2eWZCa0YxN2w2cVNQYWMxclNKRlV4SXV1NERRPT0ifSwic2lnbmFsSWRlbnRpdGllcyI6W3siaWRlbnRpZmllciI6eyJuYW1lIjoiMjQwMjI0NzM1NjAxNjk6NkBsaWQiLCJkZXZpY2VJZCI6MH0sImlkZW50aWZpZXJLZXkiOnsidHlwZSI6IkJ1ZmZlciIsImRhdGEiOiJCVTZKSktOS1NTYmxLWlB0SU9pUEpGZlFEYTFaSUNkMVIzV2lHSVV1YUtGYSJ9fV0sInBsYXRmb3JtIjoiYW5kcm9pZCIsInJvdXRpbmdJbmZvIjp7InR5cGUiOiJCdWZmZXIiLCJkYXRhIjoiQ0JJSUFnZ04ifSwibGFzdEFjY291bnRTeW5jVGltZXN0YW1wIjoxNzgxNjU1NTcxLCJteUFwcFN0YXRlS2V5SWQiOiJBQUFBQURQbCJ9";
+const SESSION_ID = "ARSLAN-MD~eyJub2lzZUtleSI6eyJwcml2YXRlIjp7InR5cGUiOiJCdWZmZXIiLCJkYXRhIjoiTU9tRFdXL2JoUDBUcHpIVS9YaVUzVDRqdnlsOGpNR05KSmI5YUxDTzAyaz0ifSwicHVibGljIjp7InR5cGUiOiJCdWZmZXIiLCJkYXRhIjoiQkQyb3ZKZjI1emdoeDRmc3M3V0JRZDdTeVZzbTFPSFU3ZWlLcjlDZmZCUT0ifX0sInBhaXJpbmdFcGhlbWVyYWxLZXlQYWlyIjp7InByaXZhdGUiOnsidHlwZSI6IkJ1ZmZlciIsImRhdGEiOiI2RzVZT1o2RitTZkQ3U0l5NXBZR3FKWjNpL3gyZjNRcitPYU81c1JkV0ZNPSJ9LCJwdWJsaWMiOnsidHlwZSI6IkJ1ZmZlciIsImRhdGEiOiJET0VxVTR2bVI0MVFkYUFnOFEyZFZiTUdHNFh1SGhXUDVOdVErWkpYb0cwPSJ9fSwic2lnbmVkSWRlbnRpdHlLZXkiOnsicHJpdmF0ZSI6eyJ0eXBlIjoiQnVmZmVyIiwiZGF0YSI6IlNGaUg4OWU4TXprZ0Z3SmJkanhxQ3RjM2hDRlFtTENXKzhqc1FQZEJPMG89In0sInB1YmxpYyI6eyJ0eXBlIjoiQnVmZmVyIiwiZGF0YSI6InV6QVdiS21HSVdMVUpSaVlldHJtMTdJOFMwZG5pejQzMm5hTXlMNDJUd0k9In19LCJzaWduZWRQcmVLZXkiOnsia2V5UGFpciI6eyJwcml2YXRlIjp7InR5cGUiOiJCdWZmZXIiLCJkYXRhIjoiZU5icHhYeUlMOUU3L3BWczU1SmNZWkkxNVloMW85bWRLdURTU252R0lucz0ifSwicHVibGljIjp7InR5cGUiOiJCdWZmZXIiLCJkYXRhIjoiMEhPajVLMXZEN1ByYXNTbTJ2bFFHQ3dRVlRnSmUvL09PM0cvb1NaM0ZuOD0ifX0sInNpZ25hdHVyZSI6eyJ0eXBlIjoiQnVmZmVyIiwiZGF0YSI6IndDL3BmLytrSTFlVDNCM0Y4dnMxT25XMzYrWEJPSHpnZGE0K0lBNkZqMURhMkZQK1duOG1aTHZYTjRhVDN6ak96UzNyVUF6V0dUZktpcUhCak5UZGl3PT0ifSwia2V5SWQiOjF9LCJyZWdpc3RyYXRpb25JZCI6MzQsImFkdlNlY3JldEtleSI6InlPYzNyeVJmOEpYaEhoWUFPb1BaaUlhaXZITTF0T3o2US9mZUFodXJVK2s9IiwicHJvY2Vzc2VkSGlzdG9yeU1lc3NhZ2VzIjpbeyJrZXkiOnsicmVtb3RlSmlkIjoiMjM0NzA4NTA4NTIyMUBzLndoYXRzYXBwLm5ldCIsImZyb21NZSI6ZmFsc2UsImlkIjoiQUMzQkVGNjBBODFCRTg4QUVDM0UzQ0M2MzNCRTMwNTciLCJwYXJ0aWNpcGFudCI6IiIsImFkZHJlc3NpbmdNb2RlIjoicG4ifSwibWVzc2FnZVRpbWVzdGFtcCI6MTc4MTY5NzU3M30seyJrZXkiOnsicmVtb3RlSmlkIjoiMjM0NzA4NTA4NTIyMUBzLndoYXRzYXBwLm5ldCIsImZyb21NZSI6ZmFsc2UsImlkIjoiQUM5RTgyRTc0QzJCQTRENjYzQTM3MTYzRUQ2MjA5MDciLCJwYXJ0aWNpcGFudCI6IiIsImFkZHJlc3NpbmdNb2RlIjoicG4ifSwibWVzc2FnZVRpbWVzdGFtcCI6MTc4MTY5NzU3NH0seyJrZXkiOnsicmVtb3RlSmlkIjoiMjM0NzA4NTA4NTIyMUBzLndoYXRzYXBwLm5ldCIsImZyb21NZSI6ZmFsc2UsImlkIjoiQUMyMUY4NTVEMEFCNTkyN0Y4MUY1REU3NUFDNzIyMjgiLCJwYXJ0aWNpcGFudCI6IiIsImFkZHJlc3NpbmdNb2RlIjoicG4ifSwibWVzc2FnZVRpbWVzdGFtcCI6MTc4MTY5NzU3Nn0seyJrZXkiOnsicmVtb3RlSmlkIjoiMjM0NzA4NTA4NTIyMUBzLndoYXRzYXBwLm5ldCIsImZyb21NZSI6ZmFsc2UsImlkIjoiQUMyMzFFNzY0NTI0QkJGQzIwQjZGNjVCMkM0RTEzNzQiLCJwYXJ0aWNpcGFudCI6IiIsImFkZHJlc3NpbmdNb2RlIjoicG4ifSwibWVzc2FnZVRpbWVzdGFtcCI6MTc4MTY5NzU3N31dLCJuZXh0UHJlS2V5SWQiOjgxMywiZmlyc3RVbnVwbG9hZGVkUHJlS2V5SWQiOjgxMywiYWNjb3VudFN5bmNDb3VudGVyIjoxLCJhY2NvdW50U2V0dGluZ3MiOnsidW5hcmNoaXZlQ2hhdHMiOmZhbHNlfSwicmVnaXN0ZXJlZCI6dHJ1ZSwicGFpcmluZ0NvZGUiOiI2SE1IQVpSSCIsIm1lIjp7ImlkIjoiMjM0NzA4NTA4NTIyMTo3QHMud2hhdHNhcHAubmV0IiwibGlkIjoiMjQwMjI0NzM1NjAxNjk6N0BsaWQifSwiYWNjb3VudCI6eyJkZXRhaWxzIjoiQ05EQXJvVUVFSjJZeXRFR0dBRWdBQ2dBIiwiYWNjb3VudFNpZ25hdHVyZUtleSI6IlRva2tvMHBKSnVVcGsrMGc2SThrVjlBTnJWa2dKM1ZIZGFJWWhTNW9vVm89IiwiYWNjb3VudFNpZ25hdHVyZSI6ImVDenU2amtYY1kwcmFyL2QxRVdKMi9RTzROWG5oUTcreTVMMGowNDZ2V2dZdDZOTEpIQjdtLzhrTmk4b3orc0pDZkozRDdEa1dVZXM1eXJrWmVBNUJ3PT0iLCJkZXZpY2VTaWduYXR1cmUiOiJVRzlkYXJQekp3MERpbnRSanpQNm5HdGlxMmc3UXJwZzZKbk1sb2VlSFFnbXRCcmQ1U0wyeWxDcXJ5T2ZGZHFoK2NzMTA0aTllMXRvWVVrNjJHOU9nZz09In0sInNpZ25hbElkZW50aXRpZXMiOlt7ImlkZW50aWZpZXIiOnsibmFtZSI6IjI0MDIyNDczNTYwMTY5OjdAbGlkIiwiZGV2aWNlSWQiOjB9LCJpZGVudGlmaWVyS2V5Ijp7InR5cGUiOiJCdWZmZXIiLCJkYXRhIjoiQlU2SkpLTktTU2JsS1pQdElPaVBKRmZRRGExWklDZDFSM1dpR0lVdWFLRmEifX1dLCJwbGF0Zm9ybSI6ImFuZHJvaWQiLCJyb3V0aW5nSW5mbyI6eyJ0eXBlIjoiQnVmZmVyIiwiZGF0YSI6IkNCSUlBZ2dOIn0sImxhc3RBY2NvdW50U3luY1RpbWVzdGFtcCI6MTc4MTY5NzU3MiwibXlBcHBTdGF0ZUtleUlkIjoiQUFBQUFLa0wifQ==";
 
 if (global.isBotRunning) {
     console.log("⚠️ Guard active: Duplicate context runner thread suspended.");
@@ -26,7 +26,7 @@ global.isBotRunning = true;
 
 const SESSION_DIR = path.join(__dirname, "auth_session_stable");
 
-// Pre-initialize configuration folders to parse incoming string elements cleanly
+// Unpack the session string directly into the project directory
 function initSessionSpace() {
     if (!fs.existsSync(SESSION_DIR)) {
         fs.mkdirSync(SESSION_DIR, { recursive: true });
@@ -49,9 +49,6 @@ initSessionSpace();
 
 const { state, saveCreds } = useMultiFileAuthState(SESSION_DIR);
 
-const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-const question = (text) => new Promise((resolve) => rl.question(text, resolve));
-
 async function startBot() {
   const { version } = await fetchLatestBaileysVersion();
   
@@ -59,16 +56,16 @@ async function startBot() {
     version, 
     auth: state, 
     logger: P({ level: "fatal" }),
-    browser: Browsers.appropriate('Chrome'), // Fixes standard signature connection drops
+    browser: Browsers.appropriate('Chrome'), // Fixed handshake signature dropping
     mobile: false
   });
 
-  // Load settings
+  // Load configuration settings
   const settings = typeof loadSettings === 'function' ? loadSettings() : {};
-  let ownerRaw = settings.ownerNumber?.[0] || "92300xxxxxxx";
+  let ownerRaw = settings.ownerNumber?.[0] || "2348153765443";
   const ownerJid = ownerRaw.includes("@s.whatsapp.net") ? ownerRaw : ownerRaw + "@s.whatsapp.net";
 
-  // Global flags config
+  // Global variables initialization
   global.sock = sock;
   global.settings = settings;
   global.signature = settings.signature || "> 𝑃𝐸𝑂𝐹𝐹𝐼𝐶𝐼𝐴𝐿 ❦ ✓";
@@ -83,17 +80,16 @@ async function startBot() {
 
   console.log("✅ BOT OWNER ASSIGNED:", global.owner);
 
-  // Sync state tracking parameters
+  // Sync session state updates
   sock.ev.on("creds.update", saveCreds);
 
-  // Connection handling logic
+  // Handle connection events
   sock.ev.on("connection.update", async ({ connection, lastDisconnect }) => {
     if (connection === "open") {
-      console.log("✅ [BOT ONLINE] Connected to WhatsApp via Session String!");
-      rl.close();
+      console.log("✅ [BOT ONLINE] Connected to WhatsApp successfully!");
     }
     if (connection === "close") {
-      const reason = new Boom(lastDisconnect?.error)?.output?.statusCode;
+      const reason = lastDisconnect?.error?.output?.statusCode || 500;
       const shouldReconnect = (reason !== DisconnectReason.loggedOut);
       console.log(`❌ Disconnected (${reason}). Reconnecting:`, shouldReconnect);
       if (shouldReconnect) {
@@ -104,7 +100,7 @@ async function startBot() {
     }
   });
 
-  // Message events processing hub
+  // Handle incoming messages
   sock.ev.on("messages.upsert", async ({ messages }) => {
     const msg = messages[0];
     if (!msg.message) return;
@@ -112,7 +108,7 @@ async function startBot() {
     const jid = msg.key.remoteJid;
     const text = msg.message?.conversation || msg.message?.extendedTextMessage?.text || "";
 
-    // View-Once Anti-Delete Media Parsing Filter Hook
+    // 🔓 INTERCEPT VIEW ONCE MEDIA BEFORE IT DISAPPEARS
     const messageType = Object.keys(msg.message)[0];
     let viewOnceContent = null;
     let mediaType = "";
@@ -125,7 +121,7 @@ async function startBot() {
 
     if (viewOnceContent) {
         try {
-            console.log(`🚨 View Once asset intercepted from ${jid}. Downloading buffer...`);
+            console.log(`🚨 View Once asset intercepted from ${jid}. Downloading...`);
             const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
             
             const stream = await downloadContentFromMessage(
@@ -150,7 +146,7 @@ async function startBot() {
         }
     }
 
-    // Core AntiDelete
+    // AntiDelete feature
     if (settings.ANTIDELETE) {
       try {
         if (msg.message) storeMessage(msg);
@@ -160,7 +156,7 @@ async function startBot() {
       }
     }
 
-    // AutoTyping
+    // AutoTyping feature
     if (global.autotyping && jid !== "status@broadcast") {
       try {
         await sock.sendPresenceUpdate('composing', jid);
@@ -170,7 +166,7 @@ async function startBot() {
       }
     }
 
-    // AutoReact
+    // AutoReact feature
     if (global.autoreact && jid !== "status@broadcast") {
       try {
         const hearts = ["❤️","☣️","🅣","🧡","💛","💚","💙","💜","🖤","🤍","🤎","💕"];
@@ -181,7 +177,7 @@ async function startBot() {
       }
     }
 
-    // AutoStatus
+    // AutoStatus feature
     if (global.autostatus && jid === "status@broadcast") {
       try {
         await sock.readMessages([{ remoteJid: jid, id: msg.key.id, participant: msg.key.participant || msg.participant }]);
@@ -192,21 +188,21 @@ async function startBot() {
       return;
     }
 
-    // Antilink
+    // Antilink feature
     if (jid.endsWith("@g.us") && global.antilink[jid] && /(chat\.whatsapp\.com|t\.me|discord\.gg|wa\.me|bit\.ly|youtu\.be|https?:\/\/)/i.test(text) && !msg.key.fromMe) {
-      try { await sock.sendMessage(jid, { delete: { remoteJid: jid, fromMe: false, id: msg.key.id, participant: msg.key.participant || msg.key.participant } }); } catch (err) { console.error("❌ Antilink Delete Error:", err.message); }
+      try { await sock.sendMessage(jid, { delete: { remoteJid: jid, fromMe: false, id: msg.key.id, participant: msg.key.participant } }); } catch (err) { console.error("❌ Antilink Delete Error:", err.message); }
     }
 
-    // AntilinkKick
+    // AntilinkKick feature
     if (jid.endsWith("@g.us") && global.antilinkick[jid] && /(chat\.whatsapp\.com|t\.me|discord\.gg|wa\.me|bit\.ly|youtu\.be|https?:\/\/)/i.test(text) && !msg.key.fromMe) {
       try { await AntiLinkKick.checkAntilinkKick({ conn: sock, m: msg }); } catch (err) { console.error("❌ AntilinkKick Error:", err.message); }
     }
 
-    // Pass downstream to plugin case processor
+    // Pass down to the modular command processors
     handleCommand(sock, msg);
   });
 
-  // AutoGreet event hook
+  // AutoGreet feature
   sock.ev.on("group-participants.update", async (update) => {
     const { id, participants, action } = update;
     if (!global.autogreet[id]) return;
@@ -229,5 +225,4 @@ async function startBot() {
   });
 }
 
-// Instantiate the environment engine 
 startBot();
